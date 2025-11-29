@@ -14,3 +14,78 @@ semantify³ - extract knowledge graph ready triples from human readable annotati
 ### Authors
 * [Tim Holzheim](https://www.semantic-mediawiki.org/wiki/Tim_Holzheim)
 * [Wolfgang Fahl](http://www.bitplan.com/Wolfgang_Fahl)
+
+### Usage
+```bash
+usage: sem3 [-h] [-a] [-d] [--debugLocalPath DEBUGLOCALPATH] [--debugPort DEBUGPORT]
+            [--debugRemotePath DEBUGREMOTEPATH] [--debugServer DEBUGSERVER] [-f] [-q] [-v] [-V] [-i INPUT]
+            [-o OUTPUT] [--format {turtle,n3,ntriples,xml,json-ld,sidif,graphml,graphson,cypher}]
+            [files ...]
+
+Extract knowledge graph ready triples from human-readable annotations wherever possible — Syntax matters!
+
+positional arguments:
+  files
+
+options:
+  -h, --help            show this help message and exit
+  -a, --about           show version info and open documentation
+  -d, --debug           enable debug output
+  --debugLocalPath DEBUGLOCALPATH
+                        remote debug Server path mapping - localPath - path on machine where python runs
+  --debugPort DEBUGPORT
+                        remote debug Port [default: 5678]
+  --debugRemotePath DEBUGREMOTEPATH
+                        remote debug Server path mapping - remotePath - path on debug server
+  --debugServer DEBUGSERVER
+                        remote debug Server
+  -f, --force           force overwrite or unsafe actions
+  -q, --quiet           suppress all output
+  -v, --verbose         increase output verbosity
+  -V, --version         show program's version number and exit
+  -i INPUT, --input INPUT
+                        Input file glob expression
+  -o OUTPUT, --output OUTPUT
+                        Output file path for triples
+  --format {turtle,n3,ntriples,xml,json-ld,sidif,graphml,graphson,cypher}
+                        Output serialization format (default: turtle)
+```
+#### Example
+```
+sem3 -i "**/*.py"
+1: yaml in extractor.py:3
+extractor:
+  isA: PythonModule
+  author: Wolfgang Fahl
+  createdAt: 2025-11-29
+  purpose: extraction of relevant markup snippets for semantify³.
+--------------------
+2: yaml in sem3_cmd.py:3
+sem3_cmd:
+  isA: PythonModule
+  author: Wolfgang Fahl
+  createdAt: 2025-11-29
+  purpose: Command-line interface for semantify³.
+--------------------
+3: yaml in test_cmd.py:3
+test_cmd:
+  isA: PythonTestModule
+  author: Wolfgang Fahl
+  createdAt: 2025-11-29
+  purpose: Unit tests for the semantify³ CLI.
+--------------------
+4: sidif in test_extractor.py:2
+test_extractor isA PythonModule
+  "Wolfgang Fahl" is author of it
+  "2025-11-29" is createdAt of it
+  "Test main micro annotation snippet extraction" is purpose of it
+--------------------
+5: yaml in test_extractor.py:63
+ypgen.bitplan.com:
+  isA: Service
+  ui: nicegui
+  url: https://ypgen.bitplan.com
+  createdAt: 2024-07-23T09:19:32.709025
+  publicity: intranet
+--------------------
+```
