@@ -10,12 +10,13 @@ sem3_cmd:
 ```
 """
 
-from argparse import ArgumentParser, Namespace
-import argparse
+import glob
 import os
 import sys
+from argparse import ArgumentParser, Namespace
 
 from basemkit.base_cmd import BaseCmd
+
 from sem3.extractor import Extractor
 from sem3.version import Version
 
@@ -28,24 +29,16 @@ class Semantify3Cmd(BaseCmd):
         super().__init__(version=Version, description=Version.description)
 
     def get_arg_parser(self) -> ArgumentParser:
-        """Create and configure the argument parser.
-
-        Returns:
-            ArgumentParser: The configured argument parser.
-        """
+        """Create and configure the argument parser."""
         parser = super().get_arg_parser()
 
-        parser.add_argument(
-            'files',
-            nargs='*',
-            help="Input files or glob patterns"
-        )
+        parser.add_argument("files", nargs="*", help="Input files or glob patterns")
 
         parser.add_argument(
             "-i",
             "--input",
-            action='append',
-            dest='input_patterns',
+            action="append",
+            dest="input_patterns",
             help="Input file glob pattern (can be specified multiple times)",
         )
         parser.add_argument(
@@ -64,38 +57,52 @@ class Semantify3Cmd(BaseCmd):
                 "xml",
                 "json-ld",
                 "sidif",
-                "graphml",  # Supported by Gremlin and Neo4j (via APOC)
-                "graphson",  # Gremlin specific JSON
-                "cypher",  # Neo4j Cypher CREATE statements
+                "graphml",
+                "graphson",
+                "cypher",
             ],
             default="turtle",
             help="Output serialization format (default: turtle)",
         )
         return parser
 
-    def handle_args(self, args: Namespace) -> bool:
-        """Handle parsed arguments.
-
-        Args:
-            args: Parsed argument namespace.
-
-        Returns:
-            bool: True if handled, False otherwise.
+    def expand_files(self, inputs: list) -> list:
         """
+        Takes a list of input arguments (file paths or glob patterns),
+        expands them, and returns a flat, unique list of file paths.
+        """
+        file_list = []
+        for input_path in inputs:
+            matches = glob.glob(input_path, recursive=True)
+            file_list.extend(matches)
+
+        return sorted(list(set(file_list)))
+
+    def handle_args(self, args: Namespace) -> bool:
+        """Handle parsed arguments."""
         handled = super().handle_args(args)
         if handled:
             return True
 
-        # Collect all input patterns from both -i and positional arguments
-        patterns = []
+        # 1. Collect all input patterns from both -i and positional arguments
+        raw_patterns = []
         if args.input_patterns:
-            patterns.extend(args.input_patterns)
+            raw_patterns.extend(args.input_patterns)
         if args.files:
-            patterns.extend(args.files)
+            raw_patterns.extend(args.files)
 
-        if patterns:
+        if raw_patterns:
+            # 2. Expand globs and deduplicate before passing to Extractor
+            files = self.expand_files(raw_patterns)
+
+            if not files and args.verbose:
+                print("No files found matching the provided patterns.")
+                return True
+
             extractor = Extractor(debug=self.debug)
-            markups = extractor.extract_from_glob_list(patterns)
+
+            # Passing concrete files list to the extractor
+            markups = extractor.extract_from_glob_list(files)
 
             if args.verbose:
                 print(f"Found {len(markups)} markups")
@@ -111,14 +118,7 @@ class Semantify3Cmd(BaseCmd):
 
 
 def main(argv=None) -> int:
-    """Main entry point for semantify3 CLI.
-
-    Args:
-        argv: Command line arguments.
-
-    Returns:
-        int: Exit code.
-    """
+    """Main entry point for semantify3 CLI."""
     cmd = Semantify3Cmd()
     return cmd.run(argv)
 

@@ -39,7 +39,7 @@ class Test_Extractor(Basetest):
                 print(f"{i+1}: {markup.lang} in {os.path.basename(markup.source)}")
                 print(markup.code)
                 print("-" * 20)
-        self.assertGreaterEqual(3, len(markups))
+        self.assertGreaterEqual(len(markups),3)
         for markup in markups:
             for field in ["isA", "author", "createdAt", "purpose"]:
                 self.assertTrue(field in markup.code)
