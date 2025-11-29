@@ -34,13 +34,19 @@ class Semantify3Cmd(BaseCmd):
             ArgumentParser: The configured argument parser.
         """
         parser = super().get_arg_parser()
-        parser.add_argument('files', type=argparse.FileType('r'), nargs='*')
+
+        parser.add_argument(
+            'files',
+            nargs='*',
+            help="Input files or glob patterns"
+        )
 
         parser.add_argument(
             "-i",
             "--input",
-            type=str,
-            help="Input file glob expression",
+            action='append',
+            dest='input_patterns',
+            help="Input file glob pattern (can be specified multiple times)",
         )
         parser.add_argument(
             "-o",
@@ -80,21 +86,26 @@ class Semantify3Cmd(BaseCmd):
         if handled:
             return True
 
-        if args.input or args.files:
+        # Collect all input patterns from both -i and positional arguments
+        patterns = []
+        if args.input_patterns:
+            patterns.extend(args.input_patterns)
+        if args.files:
+            patterns.extend(args.files)
+
+        if patterns:
             extractor = Extractor(debug=self.debug)
-            markups = []
-            if args.input:
-                markups.extend(extractor.extract_from_glob(args.input))
-            if args.files:
-                for file_path in args.files:
-                    markups.extend(extractor.extract_from_file(file_path))
+            markups = extractor.extract_from_glob_list(patterns)
+
             if args.verbose:
                 print(f"Found {len(markups)} markups")
-            for i, markup in enumerate(markups):
-                print(f"{i+1}: {markup.lang} in {os.path.basename(markup.source)}")
+
+            for i, markup in enumerate(markups, 1):
+                print(f"{i}: {markup.lang} in {os.path.basename(markup.source)}")
                 print(markup.code)
                 print("-" * 20)
-        return True
+
+            return True
 
         return False
 
