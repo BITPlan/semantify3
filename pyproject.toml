@@ -1,0 +1,74 @@
+# see https://flit.pypa.io/en/latest/pyproject_toml.html
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[project]
+name = "semantify3"
+description = "semantify³ — Extract knowledge graph ready triples from human-readable annotations wherever possible — Syntax matters!"
+keywords = ["RDF", "YAML", "SiDIF", "triples", "knowledge-graph", "semantic-web", "ontology"]
+
+authors = [
+  {name = "Wolfgang Fahl", email = "wf@WolfgangFahl.com"}
+]
+
+maintainers = [
+  { name = "Wolfgang Fahl", email = "wf@WolfgangFahl.com" },
+]
+
+readme = "README.md"
+license = {text = "Apache-2.0"}
+dependencies = [
+	# https://pypi.org/project/pybasemkit/
+	# https://github.com/WolfgangFahl/pybasemkit
+	# Python base module kit: YAML/JSON I/O, structured logging, CLI tooling, shell execution, and remote pydevd debug support.
+	"pybasemkit>=0.1.3",
+	# https://pypi.org/project/rdflib/
+	# RDF library for Python - parsing, serializing, querying RDF
+	"rdflib>=7.0.0",
+	# https://pypi.org/project/PyYAML/
+	# YAML parser and emitter for Python
+	"PyYAML>=6.0",
+]
+
+requires-python = ">=3.10"
+classifiers=[
+    "Development Status :: 3 - Alpha",
+    "Environment :: Console",
+    "Programming Language :: Python :: 3 :: Only",
+    "Programming Language :: Python :: 3.10",
+    "Programming Language :: Python :: 3.11",
+    "Programming Language :: Python :: 3.12",
+    "Programming Language :: Python :: 3.13",
+    "Operating System :: OS Independent",
+    "Topic :: Scientific/Engineering :: Information Analysis",
+    "Topic :: Text Processing :: Markup",
+    "Intended Audience :: Developers",
+    "Intended Audience :: Science/Research",
+    "License :: OSI Approved :: Apache Software License"
+]
+dynamic = ["version"]
+
+[tool.hatch.version]
+path = "sem3/__init__.py"
+
+[project.urls]
+Home = "https://github.com/WolfgangFahl/semantify3"
+Documentation = "https://wiki.bitplan.com/index.php/semantify3"
+Source = "https://github.com/WolfgangFahl/semantify3"
+
+[project.scripts]
+sem3 = "sem3.sem3_cmd:main"
+
+[project.optional-dependencies]
+test = [
+  "green",
+]
+
+[tool.hatch.build.targets.wheel]
+only-include = ["sem3"]
+
+[tool.hatch.build.targets.wheel.sources]
+"semantify3" = "sem3"
+
+

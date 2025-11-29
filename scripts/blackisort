@@ -1,0 +1,15 @@
+#!/bin/bash
+# WF 2025-11-29
+package=sem3
+
+# Sort imports
+isort tests/*.py
+isort $package/*.py
+
+# Format code
+black tests/*.py
+black $package/*.py
+
+# Format docstrings
+#docformatter --in-place tests/*.py
+#docformatter --in-place $package/*.py
