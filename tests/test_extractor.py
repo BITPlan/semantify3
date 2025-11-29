@@ -1,6 +1,6 @@
 """
 ```sidif
-🌐🕸
+# 🌐🕸
 test_extractor isA PythonModule
   "Wolfgang Fahl" is author of it
   "2025-11-29" is createdAt of it
@@ -39,7 +39,7 @@ class Test_Extractor(Basetest):
                 print(f"{i+1}: {markup.lang} in {os.path.basename(markup.source)}")
                 print(markup.code)
                 print("-" * 20)
-        self.assertGreaterEqual(3,len(markups))
+        self.assertGreaterEqual(3, len(markups))
         for markup in markups:
-            for field in ["isA","author","createdAt","purpose"]:
+            for field in ["isA", "author", "createdAt", "purpose"]:
                 self.assertTrue(field in markup.code)

@@ -1,7 +1,7 @@
 """Command-line interface for semantify³.
 
 ```yaml
-🌐🕸
+# 🌐🕸
 extractor:
   isA: PythonModule
   author: Wolfgang Fahl

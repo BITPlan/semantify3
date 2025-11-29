@@ -10,11 +10,13 @@ sem3_cmd:
 ```
 """
 
-import sys
 from argparse import ArgumentParser, Namespace
+import argparse
+import os
+import sys
 
 from basemkit.base_cmd import BaseCmd
-
+from sem3.extractor import Extractor
 from sem3.version import Version
 
 
@@ -32,6 +34,8 @@ class Semantify3Cmd(BaseCmd):
             ArgumentParser: The configured argument parser.
         """
         parser = super().get_arg_parser()
+        parser.add_argument('files', type=argparse.FileType('r'), nargs='*')
+
         parser.add_argument(
             "-i",
             "--input",
@@ -76,13 +80,21 @@ class Semantify3Cmd(BaseCmd):
         if handled:
             return True
 
-        # TODO: Implement conversion logic
-        if args.input:
-            if self.verbose:
-                print(f"Input: {args.input}")
-                print(f"Output: {args.output}")
-                print(f"Format: {args.format}")
-            return True
+        if args.input or args.files:
+            extractor = Extractor(debug=self.debug)
+            markups = []
+            if args.input:
+                markups.extend(extractor.extract_from_glob(args.input))
+            if args.files:
+                for file_path in args.files:
+                    markups.extend(extractor.extract_from_file(file_path))
+            if args.verbose:
+                print(f"Found {len(markups)} markups")
+            for i, markup in enumerate(markups):
+                print(f"{i+1}: {markup.lang} in {os.path.basename(markup.source)}")
+                print(markup.code)
+                print("-" * 20)
+        return True
 
         return False
 
