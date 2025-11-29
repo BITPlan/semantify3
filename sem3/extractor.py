@@ -65,7 +65,10 @@ class Extractor:
     def extract_from_text(
         self, text: str, source_path: Optional[str] = None
     ) -> List[Markup]:
-        """Extract all semantic markup snippets from text.
+        """Extract all semantic markup snippets from text in a single pass.
+
+        Uses one regex to find blocks (even if commented/indented), then
+        delegates logic to create_markup_from_block.
 
         Args:
             text: The source text to extract from.
@@ -74,59 +77,110 @@ class Extractor:
         Returns:
             List[Markup]: List of extracted markup snippets.
         """
+        # Step 1: Quick check to avoid regex if marker isn't there
+        if self.marker not in text:
+            return []
+
         markups = []
 
-        # Pattern to match code blocks with yaml or sidif
+        # Single Regex: Matches indentation/comments (prefix), language, and content.
+        # Ensure the closing fence matches the opening prefix exactly.
         pattern = re.compile(
-            r"```(yaml|sidif)\s*\n"  # Opening fence with language
-            r"(.*?)"  # Content (non-greedy)
-            r"\n\s*```",  # Closing fence
-            re.DOTALL,
+            r"(?P<prefix>^[ \t]*(?:#|//)?[ \t]*)```(?P<lang>yaml|sidif)\s*\n"
+            r"(?P<content>.*?)"
+            r"\n(?P=prefix)```",
+            re.DOTALL | re.MULTILINE
         )
 
         for match in pattern.finditer(text):
-            lang = match.group(1)
-            raw_content = match.group(2)
-
-            # Find first non-empty line
-            lines = raw_content.split("\n")
-            first_content_idx = None
-
-            for idx, line in enumerate(lines):
-                if line.strip():
-                    first_content_idx = idx
-                    break
-
-            if first_content_idx is None:
-                continue
-
-            first_line = lines[first_content_idx].strip()
-
-            # Check for marker
-            if self.marker not in first_line:
-                continue
-
-            # Extract content after marker line
-            content_lines = lines[first_content_idx + 1 :]
-            code = "\n".join(content_lines).strip()
-
-            if not code:
-                continue
-
-            # Calculate source line (1-based)
+            # Calculate line number based on the match start position
             line_num = text[: match.start()].count("\n") + 1
 
-            source = ""
-            if source_path:
-                source = f"{source_path}:{line_num}"
+            # Extract raw groups
+            prefix = match.group("prefix")
+            lang = match.group("lang")
+            content = match.group("content")
 
-            markup = Markup(lang=lang, code=code, source=source)
-            markups.append(markup)
+            # Delegate pure logic to testable method
+            markup = self.create_markup_from_block(
+                content, lang, prefix, line_num, source_path
+            )
+
+            if markup:
+                markups.append(markup)
 
         if self.debug and len(markups) > 0:
             self.log(f"Found {len(markups)} snippets in {source_path}")
 
         return markups
+
+    def create_markup_from_block(
+        self,
+        raw_content: str,
+        lang: str,
+        prefix: str,
+        line_num: int,
+        source_path: Optional[str]
+    ) -> Optional[Markup]:
+        """Process a raw block match into a Markup object.
+
+        This method performs the cleaning (stripping prefixes), validation
+        (checking for the marker), and object creation. It is purely logical
+        and easy to test without regex matches.
+
+        Args:
+            raw_content: The content inside the fences (still potentially indented).
+            lang: The language (yaml/sidif).
+            prefix: The indentation/comment string found before the opening fence.
+            line_num: The line number where the block started.
+            source_path: The filename/path source.
+
+        Returns:
+            Optional[Markup]: The valid Markup object, or None if invalid/empty.
+        """
+        lines = raw_content.split("\n")
+        cleaned_lines = []
+
+        # 1. Clean the lines (Strip the prefix)
+        for line in lines:
+            if line.startswith(prefix):
+                cleaned_lines.append(line[len(prefix):])
+            elif line.startswith(prefix.rstrip()):
+                # Handle lines that are just the prefix (or prefix w/o trailing space)
+                cleaned_lines.append(line[len(prefix.rstrip()):])
+            else:
+                # If indentation doesn't match, keep line as is (or could be error)
+                cleaned_lines.append(line)
+
+        # 2. Locate the first actual content line
+        first_content_idx = None
+        for idx, line in enumerate(cleaned_lines):
+            if line.strip():
+                first_content_idx = idx
+                break
+
+        if first_content_idx is None:
+            return None
+
+        # 3. Validate Marker
+        first_line = cleaned_lines[first_content_idx].strip()
+        if self.marker not in first_line:
+            return None
+
+        # 4. Extract code content (everything after the marker line)
+        code_lines = cleaned_lines[first_content_idx + 1 :]
+        code = "\n".join(code_lines).strip()
+
+        if not code:
+            return None
+
+        # 5. Build Source String
+        source = ""
+        if source_path:
+            source = f"{source_path}:{line_num}"
+
+        markup= Markup(lang=lang, code=code, source=source)
+        return markup
 
     def extract_from_glob(self, pattern: str) -> List[Markup]:
         """Extract markup snippets from files matching a glob pattern.
