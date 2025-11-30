@@ -50,9 +50,10 @@ options:
   --format {turtle,n3,ntriples,xml,json-ld,sidif,graphml,graphson,cypher}
                         Output serialization format (default: turtle)
 ```
-#### Example
+#### Examples
+##### markup extraction
 ```
-sem3 -i "**/*.py"
+sem3 --extract -i "**/*.py"
 1: yaml in extractor.py:3
 extractor:
   isA: PythonModule
@@ -88,4 +89,64 @@ ypgen.bitplan.com:
   createdAt: 2024-07-23T09:19:32.709025
   publicity: intranet
 --------------------
+```
+##### triple conversion
+```
+sem3 -i "**/*.py"
+@prefix python_module: <https://semantify3.bitplan.com/source_code/> .
+
+python_module:base_sem3test a python_module:PythonModule ;
+    python_module:author "Wolfgang Fahl" ;
+    python_module:createdAt "2025-11-30" ;
+    python_module:isA "PythonModule" ;
+    python_module:name "base_sem3test" ;
+    python_module:purpose "Base Test class for semantify³ tests" .
+
+python_module:extractor a python_module:PythonModule ;
+    python_module:author "Wolfgang Fahl" ;
+    python_module:createdAt "2025-11-29" ;
+    python_module:isA "PythonModule" ;
+    python_module:name "extractor" ;
+    python_module:purpose "extraction of relevant markup snippets for semantify³." ;
+    python_module:source "sem3/extractor.py:3" .
+
+python_module:lod2rdf a python_module:PythonModule ;
+    python_module:author "Wolfgang Fahl" ;
+    python_module:createdAt "2025-11-10" ;
+    python_module:isA "PythonModule" ;
+    python_module:name "lod2rdf" ;
+    python_module:purpose "list of dict to RDF conversion for semantify³." ;
+    python_module:source "sem3/lod2rdf.py:2" .
+
+python_module:sem3_cmd a python_module:PythonModule ;
+    python_module:author "Wolfgang Fahl" ;
+    python_module:createdAt "2025-11-29" ;
+    python_module:isA "PythonModule" ;
+    python_module:name "sem3_cmd" ;
+    python_module:purpose "Command-line interface for semantify³." ;
+    python_module:source "sem3/sem3_cmd.py:3" .
+
+python_module:test_cmd a python_module:PythonModule ;
+    python_module:author "Wolfgang Fahl" ;
+    python_module:createdAt "2025-11-29" ;
+    python_module:isA "PythonTestModule" ;
+    python_module:name "test_cmd" ;
+    python_module:purpose "Unit tests for the semantify³ CLI." ;
+    python_module:source "tests/test_cmd.py:3" .
+
+python_module:test_extractor a python_module:PythonModule ;
+    python_module:author "Wolfgang Fahl" ;
+    python_module:createdAt "2025-11-29" ;
+    python_module:isA "PythonModule" ;
+    python_module:name "test_extractor" ;
+    python_module:purpose "Test main micro annotation snippet extraction" .
+
+python_module:ypgen.bitplan.com a python_module:PythonModule ;
+    python_module:createdAt "2024-07-23 09:19:32.709025" ;
+    python_module:isA "Service" ;
+    python_module:name "ypgen.bitplan.com" ;
+    python_module:publicity "intranet" ;
+    python_module:source "tests/test_extractor.py:42" ;
+    python_module:ui "nicegui" ;
+    python_module:url "https://ypgen.bitplan.com" .
 ```
