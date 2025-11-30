@@ -8,46 +8,25 @@ test_extractor isA PythonModule
 ```
 """
 
-import os
-
-from basemkit.basetest import Basetest
-
-from sem3.extractor import Extractor
+from tests.base_sem3test import BaseSem3test
 
 
-class Test_Extractor(Basetest):
+class Test_Extractor(BaseSem3test):
     """Test the extractor."""
 
     def setUp(self, debug=True, profile=True):
-        Basetest.setUp(self, debug=debug, profile=profile)
-        self.script_path = os.path.abspath(__file__)
-        self.project_root = os.path.dirname(os.path.dirname(self.script_path))
-
-    def get_markups(self,path_glob:str="**",file_glob="*.py"):
-        # recursive=True in glob() requires the "**" pattern to actually traverse directories
-        glob_patterns = [
-            os.path.join(self.project_root, path_glob, file_glob),
-        ]
-        extractor = Extractor(debug=self.debug)
-        markups = extractor.extract_from_glob_list(glob_patterns)
-        if self.debug:
-            print(f"Found {len(markups)} markups")
-            for i, markup in enumerate(markups):
-                print(f"{i+1}: {markup.lang} in {os.path.basename(markup.source)}")
-                print(markup.code)
-                print("-" * 20)
-        return markups
+        BaseSem3test.setUp(self, debug=debug, profile=profile)
 
     def test_extract_from_own_source(self):
         """Test that the extractor can find annotations in the project's own
         source code."""
-        markups=self.get_markups()
-        self.assertGreaterEqual(len(markups),3)
+        markups = self.get_markups()
+        self.assertGreaterEqual(len(markups), 3)
         for markup in markups:
             self.assertTrue("isA" in markup.code)
             if "isA PythonModule" in markup.code:
                 for field in ["author", "createdAt", "purpose"]:
-                    self.assertTrue(field in markup.code,field)
+                    self.assertTrue(field in markup.code, field)
 
     def test_issue_5(self):
         """
@@ -81,7 +60,9 @@ class Test_Extractor(Basetest):
 
                 # Assertions to prove the prefix stripping worked:
                 # 1. The code should not contain the "# " prefix
-                self.assertFalse(markup.code.lstrip().startswith("#"), "Prefix '# ' was not stripped")
+                self.assertFalse(
+                    markup.code.lstrip().startswith("#"), "Prefix '# ' was not stripped"
+                )
 
                 # 2. Content verification
                 self.assertIn("isA: Service", markup.code)
@@ -91,4 +72,6 @@ class Test_Extractor(Basetest):
                 # 3. Lang verification
                 self.assertEqual("yaml", markup.lang)
 
-        self.assertTrue(found, "The embedded YAML block in the docstring was not extracted.")
+        self.assertTrue(
+            found, "The embedded YAML block in the docstring was not extracted."
+        )

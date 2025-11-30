@@ -15,7 +15,7 @@ class Version:
     name = "semantify³"
     version = sem3.__version__
     date = "2025-11-29"
-    updated = "2025-11-29"
+    updated = "2025-11-30"
     description = "Extract knowledge graph ready triples from human-readable annotations wherever possible — Syntax matters!"
 
     authors = "Wolfgang Fahl, Tim Holzheim"

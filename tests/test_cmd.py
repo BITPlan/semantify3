@@ -11,22 +11,21 @@ test_cmd:
 Tests for semantify³ command-line interface."""
 
 import io
+import tempfile
+from rdflib import Graph
 import os
 from contextlib import redirect_stdout
 
-from basemkit.basetest import Basetest
-
 from sem3.sem3_cmd import Semantify3Cmd, main
 from sem3.version import Version
+from tests.base_sem3test import BaseSem3test
 
 
-class TestCmd(Basetest):
+class TestCmd(BaseSem3test):
     """Test semantify³ command-line interface."""
 
     def setUp(self, debug=True, profile=True):
-        Basetest.setUp(self, debug=debug, profile=profile)
-        self.script_path = os.path.abspath(__file__)
-        self.project_root = os.path.dirname(os.path.dirname(self.script_path))
+        BaseSem3test.setUp(self, debug=debug, profile=profile)
         self.cmd = Semantify3Cmd()
 
     def capture_run(self, args):
@@ -68,7 +67,7 @@ class TestCmd(Basetest):
     def test_extract_from_single_file(self):
         """Test extracting markups from a single file."""
         test_file = os.path.join(self.project_root, "sem3", "extractor.py")
-        exit_code, output = self.capture_run([test_file])
+        exit_code, output = self.capture_run(["--extract", test_file])
 
         self.assertEqual(exit_code, 0)
         self.assertIn("yaml in extractor.py", output)
@@ -78,7 +77,7 @@ class TestCmd(Basetest):
     def test_extract_with_glob_pattern(self):
         """Test extracting markups using -i with glob pattern."""
         pattern = os.path.join(self.project_root, "sem3", "*.py")
-        exit_code, output = self.capture_run(["-i", pattern])
+        exit_code, output = self.capture_run(["--extract", "-i", pattern])
 
         self.assertEqual(exit_code, 0)
         self.assertIn("extractor:", output)
@@ -89,7 +88,9 @@ class TestCmd(Basetest):
         py_pattern = os.path.join(self.project_root, "sem3", "*.py")
         md_pattern = os.path.join(self.project_root, "*.md")
 
-        exit_code, output = self.capture_run(["-i", py_pattern, "-i", md_pattern])
+        exit_code, output = self.capture_run(
+            ["--extract", "-i", py_pattern, "-i", md_pattern]
+        )
 
         self.assertEqual(exit_code, 0)
         self.assertIn("extractor:", output)
@@ -98,7 +99,7 @@ class TestCmd(Basetest):
     def test_extract_with_verbose(self):
         """Test verbose output."""
         test_file = os.path.join(self.project_root, "sem3", "extractor.py")
-        exit_code, output = self.capture_run(["--verbose", test_file])
+        exit_code, output = self.capture_run(["--extract", "--verbose", test_file])
 
         self.assertEqual(exit_code, 0)
         self.assertIn("Found 1 markups", output)
@@ -109,7 +110,7 @@ class TestCmd(Basetest):
         file1 = os.path.join(self.project_root, "sem3", "extractor.py")
         file2 = os.path.join(self.project_root, "sem3", "version.py")
 
-        exit_code, output = self.capture_run(["-i", file1, file2])
+        exit_code, output = self.capture_run(["--extract", "-i", file1, file2])
 
         self.assertEqual(exit_code, 0)
         self.assertIn("extractor:", output)
@@ -122,7 +123,7 @@ class TestCmd(Basetest):
         # bypasses self.cmd, and we want to test that specific wiring.
         capture = io.StringIO()
         with redirect_stdout(capture):
-            exit_code = main([test_file])
+            exit_code = main(["--extract", test_file])
 
         self.assertEqual(exit_code, 0)
         output = capture.getvalue()
@@ -132,23 +133,62 @@ class TestCmd(Basetest):
     def test_debug_mode(self):
         """Test debug mode."""
         test_file = os.path.join(self.project_root, "sem3", "extractor.py")
-        exit_code, output = self.capture_run(["--debug", test_file])
+        exit_code, output = self.capture_run(["--extract", "--debug", test_file])
 
         self.assertEqual(exit_code, 0)
         self.assertIn("extractor:", output)
 
+
     def test_format_options(self):
-        """Test that format options are accepted."""
-        test_file = os.path.join(self.project_root, "sem3", "extractor.py")
-        for fmt in ["turtle", "n3", "json-ld", "sidif"]:
-            exit_code, output = self.capture_run(["--format", fmt, test_file])
-            self.assertEqual(exit_code, 0)
-            self.assertIn("extractor", output)
+        """Test all available RDF formats via Command Line """
+        formats = [
+            ("turtle", "ttl"),
+            ("n3", "n3"),
+            ("ntriples", "nt"),
+            ("json-ld", "jsonld")
+        ]
+        # files to check - eat you own dog-food style
+        # we will pick up all python source code markups
+        glob_pattern = "**/*.py"
+
+        temp_files = []
+        # allow inspecting the RDF dump results in temporary directory
+        keep_files=True
+
+        try:
+            for fmt, ext in formats:
+                with self.subTest(format=fmt):
+                    fd, output_file = tempfile.mkstemp(suffix=f'.{ext}')
+                    os.close(fd)
+                    temp_files.append(output_file)
+
+                    args = ["--debug", "--format", fmt, "--output", output_file, glob_pattern]
+                    exit_code, output = self.capture_run(args)
+                    self.assertEqual(exit_code, 0)
+                    self.assertIn("RDF saved to:", output)
+
+                    g = Graph()
+                    g.parse(output_file, format=fmt)
+                    self.assertGreater(len(g), 0)
+
+                    if self.debug:
+                        print(f"✓ {output_file} ({len(g)} triples)")
+
+        finally:
+            cmd="cat"
+            for f in temp_files:
+                if os.path.exists(f):
+                    if keep_files:
+                        cmd+=f" {f}"
+                    else:
+                        os.unlink(f)
+            if keep_files:
+                print (cmd)
 
     def test_extract_from_own_source(self):
         """Test that the extractor can find annotations in the project's own source code."""
         pattern = os.path.join(self.project_root, "**", "*.py")
-        exit_code, output = self.capture_run(["-i", pattern])
+        exit_code, output = self.capture_run(["--extract", "-i", pattern])
 
         self.assertEqual(exit_code, 0)
 

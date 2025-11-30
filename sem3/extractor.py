@@ -12,11 +12,15 @@ extractor:
 
 import glob
 import logging
+import os
 import re
+import textwrap
 from dataclasses import dataclass
-from typing import List, Optional
+from typing import Any, Dict, List, Optional
 
+import yaml
 from basemkit.yamlable import lod_storable
+from sidif.sidif import SiDIFParser
 
 
 @lod_storable
@@ -32,9 +36,16 @@ class Markup:
 class Extractor:
     """Extract semantic annotation markup from files."""
 
-    def __init__(self, marker: str = "🌐🕸", debug: bool = False):
-        """constructor."""
+    def __init__(self, marker: str = "🌐🕸", lenient: bool = True, debug: bool = False):
+        """
+        constructor for Semantic markup Extractor
+        Args:
+            marker (str, optional): utf-8 symbol sequence inside backticks that calls for picking up semantic markup
+            lenient (bool): if True (default) - only log exception if false raise
+            debug (bool): if True log debug output otherwise ignore log messages
+        """
         self.marker = marker
+        self.lenient = lenient
         self.debug = debug
         self.logger = logging.getLogger(__name__)
         self.logger.setLevel(logging.DEBUG if debug else logging.INFO)
@@ -89,7 +100,7 @@ class Extractor:
             r"(?P<prefix>^[ \t]*(?:#|//)?[ \t]*)```(?P<lang>yaml|sidif)\s*\n"
             r"(?P<content>.*?)"
             r"\n(?P=prefix)```",
-            re.DOTALL | re.MULTILINE
+            re.DOTALL | re.MULTILINE,
         )
 
         for match in pattern.finditer(text):
@@ -120,7 +131,7 @@ class Extractor:
         lang: str,
         prefix: str,
         line_num: int,
-        source_path: Optional[str]
+        source_path: Optional[str],
     ) -> Optional[Markup]:
         """Process a raw block match into a Markup object.
 
@@ -144,10 +155,10 @@ class Extractor:
         # 1. Clean the lines (Strip the prefix)
         for line in lines:
             if line.startswith(prefix):
-                cleaned_lines.append(line[len(prefix):])
+                cleaned_lines.append(line[len(prefix) :])
             elif line.startswith(prefix.rstrip()):
                 # Handle lines that are just the prefix (or prefix w/o trailing space)
-                cleaned_lines.append(line[len(prefix.rstrip()):])
+                cleaned_lines.append(line[len(prefix.rstrip()) :])
             else:
                 # If indentation doesn't match, keep line as is (or could be error)
                 cleaned_lines.append(line)
@@ -179,7 +190,7 @@ class Extractor:
         if source_path:
             source = f"{source_path}:{line_num}"
 
-        markup= Markup(lang=lang, code=code, source=source)
+        markup = Markup(lang=lang, code=code, source=source)
         return markup
 
     def extract_from_glob(self, pattern: str) -> List[Markup]:
@@ -221,3 +232,81 @@ class Extractor:
             all_markups.extend(markups)
 
         return all_markups
+
+    def markups_to_lod(self, markups: List["Markup"]) -> List[Dict[str, Any]]:
+        """
+        Convert the given list of markups to a **flat** list of dicts LOD.
+        - YAML: {"extractor": {"isA": "PythonModule", ...}} → [{"name": "extractor", "isA": "PythonModule", ...}]
+        - SiDIF: "base_sem3test isA PythonModule\n... is author of it" → [{"name": "base_sem3test", "isA": "PythonModule", "author": "..."}]
+        Uses py-sidif parser for full SiDIF support.
+        """
+        lod = []
+        sidif_parser = SiDIFParser(showErrors=False)  # Silent, no debug
+
+        for markup in markups:
+            try:
+                if markup.lang == "yaml":
+                    data = yaml.safe_load(markup.code or "")
+                    if not isinstance(data, dict):
+                        continue
+                    # Flatten ALL top-level keys (handles single/multi YAML)
+                    for name, props in data.items():
+                        flat_props = {}
+                        if isinstance(props, dict):
+                            flat_props = props.copy()
+                        else:
+                            flat_props = {"value": props}  # Rare scalar
+                        flat_props["name"] = name
+                        flat_props["source"] = markup.source
+                        lod.append(flat_props)
+
+                elif markup.lang == "sidif":
+                    # fix indentation from code blocks
+                    sidif_code = textwrap.dedent(markup.code or "")
+                    title = f"{markup.source}"
+                    # Parse with py-sidif → DataInterchange → dict of dicts → flatten each subject
+                    result, error = sidif_parser.parseText(
+                        markup.code or "",
+                    )
+                    if error is None and result:
+                        dif = result[0]  # DataInterchange
+                        nested_dod = dif.toDictOfDicts()
+                        for subject_name, subject_props in nested_dod.items():
+                            flat_props = subject_props.copy()
+                            flat_props["name"] = subject_name
+                            lod.append(flat_props)
+
+            except Exception as ex:
+                if self.lenient:
+                    msg = f"Lenient: skipped {markup.lang} in {markup.source}: {ex}"
+                    self.log(msg)
+                else:
+                    raise ex
+
+        return lod
+
+    def print_markups(self, markups: list, limit: int = None, verbose: bool = True):
+        """
+        Helper to print a list of markups to stdout for debugging/CLI output.
+
+        Args:
+            markups: List of extracted markup objects
+            limit: Maximum number of markups to print (default: None for all)
+            verbose: if True print the length of markups
+        """
+        if verbose:
+            print(f"Found {len(markups)} markups")
+
+        # Slice the list if a limit is provided
+        subset = markups[:limit] if limit else markups
+
+        for i, markup in enumerate(subset, 1):
+            source_file = (
+                os.path.basename(markup.source) if markup.source else "unknown"
+            )
+            print(f"{i}: {markup.lang} in {source_file}")
+            print(markup.code)
+            print("-" * 20)
+
+        if limit and len(markups) > limit:
+            print(f"... ({len(markups) - limit} more markups not shown)")

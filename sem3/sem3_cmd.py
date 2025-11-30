@@ -11,7 +11,6 @@ sem3_cmd:
 """
 
 import glob
-import os
 import sys
 from argparse import ArgumentParser, Namespace
 
@@ -19,6 +18,7 @@ from basemkit.base_cmd import BaseCmd
 
 from sem3.extractor import Extractor
 from sem3.version import Version
+from sem3.lod2rdf import RDFDumper
 
 
 class Semantify3Cmd(BaseCmd):
@@ -48,22 +48,52 @@ class Semantify3Cmd(BaseCmd):
             help="Output file path for triples",
         )
         parser.add_argument(
+            "--extract",
+            action="store_true",
+            help="only extract and display markup snippets",
+        )
+        parser.add_argument(
             "--format",
             type=str,
             choices=[
                 "turtle",
                 "n3",
                 "ntriples",
-                "xml",
+                #"xml",
                 "json-ld",
-                "sidif",
-                "graphml",
-                "graphson",
-                "cypher",
+                #"sidif",
+                #"graphml",
+                #"graphson",
+                #"cypher",
             ],
             default="turtle",
             help="Output serialization format (default: turtle)",
         )
+        parser.add_argument(
+            "--base-uri",
+            type=str,
+            default="https://semantify3.bitplan.com/source_code/",
+            help="Base URI for RDF subjects (default: https://semantify3.bitplan.com/source_code/)",
+        )
+        parser.add_argument(
+            "--namespace",
+            type=str,
+            default="python_module",
+            help="Namespace prefix (default: python_module)",
+        )
+        parser.add_argument(
+            "--type-name",
+            type=str,
+            default="PythonModule",
+            help="RDF type/fallback class (default: PythonModule)",
+        )
+        parser.add_argument(
+            "--id-field",
+            type=str,
+            default="name",
+            help="Dict field for subject ID (default: name)",
+        )
+
         return parser
 
     def expand_files(self, inputs: list) -> list:
@@ -77,6 +107,26 @@ class Semantify3Cmd(BaseCmd):
             file_list.extend(matches)
 
         return sorted(list(set(file_list)))
+
+    def serialize_lod(self, lod: list[dict], args) -> bool:
+        """LOD → RDF Graph → serialize (file/stdout)."""
+        dumper = RDFDumper(
+            base_uri=args.base_uri,
+            namespace_prefix=args.namespace,
+            debug=self.debug  # Pass CLI debug
+        )
+        rdf_graph = dumper.as_rdf(lod, args.type_name, args.id_field)
+        output_format = args.format
+        if args.output:
+            rdf_graph.serialize(destination=args.output, format=output_format)
+            if self.debug:
+                print(f"RDF saved to: {args.output}")
+        else:
+            serialized = rdf_graph.serialize(format=output_format)
+            if isinstance(serialized, bytes):
+                serialized = serialized.decode('utf-8')
+            print(serialized)
+        return True
 
     def handle_args(self, args: Namespace) -> bool:
         """Handle parsed arguments."""
@@ -103,15 +153,14 @@ class Semantify3Cmd(BaseCmd):
 
             # Passing concrete files list to the extractor
             markups = extractor.extract_from_glob_list(files)
-
-            if args.verbose:
-                print(f"Found {len(markups)} markups")
-
-            for i, markup in enumerate(markups, 1):
-                print(f"{i}: {markup.lang} in {os.path.basename(markup.source)}")
-                print(markup.code)
-                print("-" * 20)
-
+            if args.extract:
+                extractor.print_markups(markups, verbose=args.verbose)
+            else:
+                # get the list of dict representation of the markups
+                lod = extractor.markups_to_lod(markups)
+                if self.debug:
+                    print(f"LOD: {len(lod)} items")
+                self.serialize_lod(lod, args)
             return True
 
         return False
