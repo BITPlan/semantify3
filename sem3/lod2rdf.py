@@ -146,7 +146,7 @@ class RDFDumper:
         Args:
             graph: Target rdflib.Graph.
             item_dict: Dictionary with resource data.
-            type_name: RDF type name for resource.
+            type_name: RDF type name for resource (used as fallback if isA not in data).
             id_field: Field name containing resource identifier.
             idx: Index for auto-generating IDs.
         """
@@ -156,7 +156,10 @@ class RDFDumper:
             resource_id = f"{type_name.lower()}_{idx}"
 
         subject = URIRef(f"{self.base_uri}{resource_id}")
-        graph.add((subject, RDF.type, self.ns[type_name]))
+        
+        # Use isA from data if available, otherwise fall back to type_name parameter
+        actual_type = item_dict.get('isA', type_name)
+        graph.add((subject, RDF.type, self.ns[actual_type]))
 
         for key, value in item_dict.items():
             if value is not None:
