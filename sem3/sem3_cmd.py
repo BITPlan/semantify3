@@ -17,7 +17,6 @@ from argparse import ArgumentParser, Namespace
 from basemkit.base_cmd import BaseCmd
 
 from sem3.extractor import Extractor
-from sem3.homepage import ENGINE_GLOBS, ServiceHomepage
 from sem3.lod2rdf import RDFDumper
 from sem3.version import Version
 
@@ -52,23 +51,6 @@ class Semantify3Cmd(BaseCmd):
             "--extract",
             action="store_true",
             help="only extract and display markup snippets",
-        )
-        parser.add_argument(
-            "--homepage",
-            action="store_true",
-            help="render a service-overview homepage from annotated web-server configs",
-        )
-        parser.add_argument(
-            "--engine",
-            type=str,
-            choices=sorted(ENGINE_GLOBS.keys()),
-            default="apache",
-            help="web-server engine whose default config glob is used when no input is given (default: apache)",
-        )
-        parser.add_argument(
-            "--title",
-            type=str,
-            help="homepage title / heading (default: the engine name)",
         )
         parser.add_argument(
             "--format",
@@ -146,34 +128,6 @@ class Semantify3Cmd(BaseCmd):
             print(serialized)
         return True
 
-    def generate_homepage(self, args: Namespace, raw_patterns: list) -> bool:
-        """
-        Render the service-overview homepage from annotated web-server configs.
-
-        Args:
-            args: parsed command-line arguments
-            raw_patterns: explicit input globs (-i / positional); when empty the
-                engine's default config glob is used
-
-        Returns:
-            True (the homepage request was handled)
-        """
-        patterns = raw_patterns if raw_patterns else ENGINE_GLOBS.get(args.engine, [])
-        title = args.title if args.title else args.engine
-        homepage = ServiceHomepage(title=title, debug=self.debug)
-        service_count = homepage.read_files(patterns)
-        if self.debug:
-            print(f"homepage: {service_count} services from {len(patterns)} pattern(s)")
-        page = homepage.as_html()
-        if args.output:
-            with open(args.output, "w", encoding="utf-8") as html_file:
-                html_file.write(page)
-            if self.debug:
-                print(f"homepage written to: {args.output}")
-        else:
-            print(page)
-        return True
-
     def handle_args(self, args: Namespace) -> bool:
         """Handle parsed arguments."""
         handled = super().handle_args(args)
@@ -186,9 +140,6 @@ class Semantify3Cmd(BaseCmd):
             raw_patterns.extend(args.input_patterns)
         if args.files:
             raw_patterns.extend(args.files)
-
-        if args.homepage:
-            return self.generate_homepage(args, raw_patterns)
 
         if raw_patterns:
             # 2. Expand globs and deduplicate before passing to Extractor
