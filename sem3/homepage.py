@@ -79,10 +79,11 @@ class Service:
         Returns:
             an <li> element linking to the service url
         """
-        item = '<li><a href="{href}" target="_blank" title="{title}">{label}</a></li>'.format(
-            href=html.escape(self.url, quote=True),
-            title=html.escape(self.tooltip(), quote=True),
-            label=html.escape(self.id),
+        href = html.escape(self.url, quote=True)
+        tooltip = html.escape(self.tooltip(), quote=True)
+        label = html.escape(self.id)
+        item = (
+            f'<li><a href="{href}" target="_blank" title="{tooltip}">{label}</a></li>'
         )
         return item
 
@@ -160,6 +161,21 @@ class ServiceHomepage:
             service_list.sort(key=lambda service: service.id)
         return grouped
 
+    def section_as_html(self, section_title: str, services: List["Service"]) -> str:
+        """
+        Render one publicity section as a heading followed by a service list.
+
+        Args:
+            section_title: the visible section heading
+            services: the (already sorted) services of this section
+
+        Returns:
+            the section's HTML
+        """
+        items = "\n".join(f"  {service.as_html()}" for service in services)
+        section = f"<h2>{html.escape(section_title)}</h2>\n<ul>\n{items}\n</ul>"
+        return section
+
     def as_html(self) -> str:
         """
         Render the full service-overview homepage.
@@ -168,30 +184,24 @@ class ServiceHomepage:
             a complete, self-contained HTML document
         """
         grouped = self.services_by_section()
-        parts: List[str] = []
-        parts.append("<!DOCTYPE html>")
-        parts.append('<html lang="en">')
-        parts.append("<head>")
-        parts.append('<meta charset="utf-8"/>')
-        parts.append(f"<title>{html.escape(self.title)}</title>")
-        parts.append("</head>")
-        parts.append("<body>")
-        parts.append(f"<h1>{html.escape(self.title)}</h1>")
-        parts.append(
-            "<p>Service list generated from "
-            '<a href="https://github.com/BITPlan/semantify3">semantify3</a>'
-            "-annotated web-server configurations.</p>"
+        sections = "\n".join(
+            self.section_as_html(section_title, grouped[publicity])
+            for publicity, section_title in self.sections.items()
+            if grouped.get(publicity)
         )
-        for publicity, section_title in self.sections.items():
-            service_list = grouped.get(publicity)
-            if not service_list:
-                continue
-            parts.append(f"<h2>{html.escape(section_title)}</h2>")
-            parts.append("<ul>")
-            for service in service_list:
-                parts.append(f"  {service.as_html()}")
-            parts.append("</ul>")
-        parts.append("</body>")
-        parts.append("</html>")
-        page = "\n".join(parts)
+        title = html.escape(self.title)
+        credit = '<a href="https://github.com/BITPlan/semantify3">semantify3</a>'
+        page = f"""\
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8"/>
+<title>{title}</title>
+</head>
+<body>
+<h1>{title}</h1>
+<p>Service list generated from {credit}-annotated web-server configurations.</p>
+{sections}
+</body>
+</html>"""
         return page
